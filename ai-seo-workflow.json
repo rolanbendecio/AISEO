@@ -1,0 +1,278 @@
+{
+  "name": "AI SEO by Diggity - Advanced AI SEO Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "url": "={{ $json.website_url }}/server-logs",
+        "options": {
+          "headers": {
+            "Authorization": "Bearer {{ $json.api_key }}"
+          }
+        }
+      },
+      "id": "log-fetcher",
+      "name": "Fetch Server Logs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-sonnet-20241022",
+        "prompt": "You are an AI SEO expert analyzing server logs to identify crawl patterns, bot visibility issues, and opportunities for internal linking. Analyze the provided server logs and identify:\n1. Pages with low bot crawl rates\n2. Crawl patterns of AI bots (GPTBot, ChatGPT-User, etc.)\n3. Search engine bot patterns\n4. Recommendations for internal linking\n5. Technical SEO issues\n\nReturn your analysis as structured JSON with specific actionable recommendations.\n\nServer logs to analyze: {{ $json.logs }}"
+      },
+      "id": "log-analyzer",
+      "name": "AI Log Analysis",
+      "type": "n8n-nodes-base.anthropic",
+      "typeVersion": 1.3,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-sonnet-20241022",
+        "prompt": "You are an expert in structured data markup. Generate appropriate JSON-LD schema markup for the provided content. Include:\n1. Article schema\n2. BlogPosting schema\n3. HowTo schema (if applicable)\n4. FAQPage schema (if FAQ content exists)\n5. BreadcrumbList schema\n\nEnsure all markup follows schema.org standards and is optimized for AI understanding.\n\nContent to generate structured data for: {{ $json.content }}"
+      },
+      "id": "schema-generator",
+      "name": "Generate Structured Data",
+      "type": "n8n-nodes-base.anthropic",
+      "typeVersion": 1.3,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-sonnet-20241022",
+        "prompt": "You are a multimodal content optimization expert. Analyze the provided content and suggest improvements for AI visibility:\n1. Content structure optimization\n2. Internal linking opportunities\n3. Multimodal elements (images, videos, tables)\n4. AI-friendly formatting\n5. Semantic improvements\n6. Content gaps and expansion opportunities\n\nProvide specific, actionable recommendations.\n\nContent to optimize for AI search: {{ $json.content }}"
+      },
+      "id": "content-optimizer",
+      "name": "AI Content Optimization",
+      "type": "n8n-nodes-base.anthropic",
+      "typeVersion": 1.3,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.webhook_url }}",
+        "httpMethod": "POST",
+        "sendQuery": false,
+        "sendHeaders": false,
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "log_analysis",
+              "value": "={{ $('AI Log Analysis').item.json.content }}"
+            },
+            {
+              "name": "structured_data",
+              "value": "={{ $('Generate Structured Data').item.json.content }}"
+            },
+            {
+              "name": "content_optimization",
+              "value": "={{ $('AI Content Optimization').item.json.content }}"
+            },
+            {
+              "name": "timestamp",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "results-sender",
+      "name": "Send Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "internal-links-needed",
+              "leftValue": "={{ $json.log_analysis }}",
+              "rightValue": "internal link",
+              "operator": {
+                "type": "string",
+                "operation": "contains",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "link-checker",
+      "name": "Check Internal Links Needed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 500]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-sonnet-20241022",
+        "prompt": "Based on the log analysis, generate specific internal linking suggestions. Create a JSON array of linking opportunities with:\n1. Source page URL\n2. Target page URL\n3. Anchor text suggestion\n4. Link placement context\n5. SEO rationale\n\nFocus on pages with low bot visibility that need more internal link equity.\n\nLog analysis to base internal linking strategy on: {{ $json.log_analysis }}"
+      },
+      "id": "link-generator",
+      "name": "Generate Internal Links",
+      "type": "n8n-nodes-base.anthropic",
+      "typeVersion": 1.3,
+      "position": [680, 500]
+    },
+    {
+      "parameters": {
+        "triggerOn": "webhookReceived",
+        "httpMethod": "POST",
+        "path": "ai-seo-workflow",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [20, 300],
+      "webhookId": "ai-seo-workflow"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "schema-needed",
+              "leftValue": "={{ $json.content }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "schema-checker",
+      "name": "Check Schema Needed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 100]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Server Logs",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Schema Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Server Logs": {
+      "main": [
+        [
+          {
+            "node": "AI Log Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Log Analysis": {
+      "main": [
+        [
+          {
+            "node": "AI Content Optimization",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Internal Links Needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Structured Data": {
+      "main": [
+        [
+          {
+            "node": "Send Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Content Optimization": {
+      "main": [
+        [
+          {
+            "node": "Send Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Internal Links Needed": {
+      "main": [
+        [
+          {
+            "node": "Generate Internal Links",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Schema Needed": {
+      "main": [
+        [
+          {
+            "node": "Generate Structured Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2024-01-01T00:00:00.000Z",
+      "updatedAt": "2024-01-01T00:00:00.000Z",
+      "id": "ai-seo",
+      "name": "AI SEO"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}
